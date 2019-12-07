@@ -11,11 +11,14 @@ public class GameplayManager : MonoBehaviour {
 
     public const float dotRadius = 0.3f;
 
+    public int highScore = 0;
+
     public Player player;
     public GameObject dot;
-    public Text score;
-
-    public int dotsHit;
+    public Text scoreText;
+    public Canvas canvas;
+    private Animator canvasAnimator;
+    public GameObject mainCamera;
 
     public float minGravity = -20;
     public float maxGravity = -80;
@@ -26,6 +29,9 @@ public class GameplayManager : MonoBehaviour {
     public float minArcWidth = 1.0f;
     public float maxArcWidth = 2.0f;
 
+    public int scorePerDotHit = 1;
+    public float gravityDecrementPerHit = 0.5f;
+
     // private variables
     private System.Random random = new System.Random();
 
@@ -33,48 +39,101 @@ public class GameplayManager : MonoBehaviour {
     private Collider2D dotCollider;
 
     private float timeToSpawnNewDot;
-    private bool running;
+    private int score;
 
     private Vector3 cameraDimensions;
 
+    enum AppState {Menu, Playing, Lost, GameOver};
+
+    AppState appState = AppState.Menu;
+
     // Start is called before the first frame update
     void Awake() {
+        highScore = PlayerPrefs.GetInt("High_Score");
+
         UpdateGravity(minGravity);
 
         playerCollider = player.GetComponent<Collider2D>();
         dotCollider = dot.GetComponent<Collider2D>();
 
-        dotsHit = 0;
+        score = 0;
         timeToSpawnNewDot = 0.6f;
-        running = true;
+        appState = AppState.Menu;
 
-        Jump();
-        SpawnDot();
         cameraDimensions = GetCameraDimensions();
+        canvasAnimator = canvas.GetComponent<Animator>();
     }
 
     // Update is called once per frame
     void Update() {
-
-        if (Input.GetMouseButtonDown(0) && running) {
+        if (Input.GetMouseButtonDown(0) && appState == AppState.Menu) {
+            appState = AppState.Playing;
+            Jump();
+            SpawnDot();
+            canvasAnimator.SetTrigger("Game Start");
+            canvasAnimator.ResetTrigger("Restart");
+        } else if (Input.GetMouseButtonDown(0) && appState == AppState.Playing) {
             if (!playerCollider.bounds.Intersects(dotCollider.bounds)) {
-                running = false;
+                appState = AppState.Lost;
                 return;
             }
 
+            FindObjectOfType<AudioManager>().Play("Pop", (float)random.NextDouble()*(1.1f-0.9f) + 0.9f);
             player.SetDirection((player.transform.position.x <= 0) ? 1 : -1);
             Jump();
             RandomizeDotSpawnTime();
             SpawnDot();
 
-            AddScore(1);
-            UpdateGravity(Math.Max(maxGravity, Physics2D.gravity.y - 2));
+            AddScore(scorePerDotHit);
+            UpdateGravity(Math.Max(maxGravity, Physics2D.gravity.y - gravityDecrementPerHit));
             player.UpdateRotation();
+        } else if (Input.GetMouseButtonDown(0) && appState == AppState.GameOver) {
+            Restart();
         }
+
+        Vector3 CamDimensions = GetCameraDimensions();
+        if (Math.Abs(player.transform.position.x) > CamDimensions.x
+            || player.transform.position.y < Camera.main.transform.position.y - 5.0f
+            && (appState == AppState.Playing
+            || appState == AppState.Lost)) {
+            GameOver();
+        }
+
+    }
+
+    private void Restart() {
+        appState = AppState.Menu;
+        canvasAnimator.SetTrigger("Restart");
+        canvasAnimator.ResetTrigger("Game Over");
+     
+        player.transform.position = new Vector3(0, 0.9f, 0);
+        player.transform.rotation = new Quaternion();
+        mainCamera.transform.position = new Vector3(0, 5.0f, -10.0f);
+        UpdateGravity(minGravity);
+
+        cameraDimensions = GetCameraDimensions();
+
+        player.SetArcHeight(0.0f);
+        player.SetArcWidth(0.0f);
+        player.rigidBody2D.velocity = new Vector2(0.0f, 0.0f);
+        timeToSpawnNewDot = 0.6f;
+        score = 0;
+    }
+
+    private void GameOver() {
+        appState = AppState.GameOver;
+        if (score > highScore) {
+            highScore = score;
+            PlayerPrefs.SetInt("High_Score", highScore);
+            PlayerPrefs.Save();
+        }
+        UpdateScore();
+
+        canvasAnimator.SetTrigger("Game Over");
+        canvasAnimator.ResetTrigger("Game Start");
     }
 
     private void Jump() {
-
         player.SetArcHeight((float)random.NextDouble() * (maxArcHeight - minArcHeight) + minArcHeight);
         player.SetArcWidth((float)random.NextDouble() * (maxArcWidth- minArcWidth) + minArcWidth);
         player.UpdateVelocity();
@@ -117,8 +176,11 @@ public class GameplayManager : MonoBehaviour {
     }
 
     private void AddScore(int x) {
-        dotsHit += x;
-        score.text = "Score: " + (dotsHit * 10).ToString();
+        score += x;
+    }
+
+    private void UpdateScore() {
+        scoreText.text = "Score: " + score + " Best: " + highScore;
     }
 
     private Vector3 GetCameraDimensions() {

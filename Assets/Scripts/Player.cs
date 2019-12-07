@@ -22,9 +22,11 @@ public class Player : MonoBehaviour {
     private float velX;
     private float velY;
 
+    private int rotationSpeedScale = 15;
+
     void Awake() {
         direction = 1;
-        rotationSpeed = 20;
+        //rotationSpeed = 20;
 
         arcHeight = 0.0f;
         arcWidth = 0.0f;
@@ -46,12 +48,13 @@ public class Player : MonoBehaviour {
         velY = (float)Math.Sqrt(-2 * Physics2D.gravity.y * arcHeight);
         velX = arcWidth / (-velY/Physics2D.gravity.y);
 
+        int velocityForRotation= (int)(velX * velY);
+
         rigidBody2D.velocity = new Vector2(velX * direction, velY);
-        rotationSpeed = random.Next((int)(velX * velY), (int)(velX * velY) * 5);
+        rotationSpeed = random.Next(velocityForRotation/2, velocityForRotation);
     }
 
     public void UpdateRotation() {
-        //this.transform.eulerAngles += Vector3.forward * -direction * rotationSpeed * Time.deltaTime;
-        this.rigidBody2D.angularVelocity = 600.0f * rotationSpeed * -direction;
+        this.rigidBody2D.angularVelocity = rotationSpeedScale * rotationSpeed * -direction;
     }
 }

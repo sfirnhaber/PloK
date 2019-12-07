@@ -9,6 +9,7 @@ public class CameraScript : MonoBehaviour
 
     public float smoothSpeed = 0.125f;
     public Vector3 offset;
+    public GameObject background;
 
     public float bottomEdgeYPos;
     
@@ -22,6 +23,7 @@ public class CameraScript : MonoBehaviour
     // Update is called once per frame
     void LateUpdate()
     {
+        background.transform.position = new Vector3(background.transform.position.x, transform.position.y, background.transform.position.z);
         if (target.transform.position.y >= transform.position.y) {
             Vector3 newPos = new Vector3(0, target.transform.position.y, -10);
             transform.position = newPos;
